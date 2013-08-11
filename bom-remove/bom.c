@@ -1,7 +1,5 @@
 #include "bom.h"
 
-#include <CoreFoundation/CFDictionary.h>
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -55,8 +53,8 @@ int bom_read_header(bom_file_t *f)
 
 int bom_read_index(bom_file_t *f)
 {
-    uint32_t index_offset;
-    uint32_t index_size;
+    uint32_t index_off;
+    uint32_t index_sz;
     int err;
 
     if(f->header == NULL)
@@ -64,14 +62,14 @@ int bom_read_index(bom_file_t *f)
 
     ALLOC_CHECK(f->index_header = malloc(sizeof(bom_index_header_t)))
 
-    index_offset = ntohl(f->header->index_header_offset);
-    index_size = ntohl(f->header->index_header_size) - sizeof(bom_index_header_t);
+    index_off = ntohl(f->header->index_header_offset);
+    index_sz = ntohl(f->header->index_header_size) - sizeof(bom_index_header_t);
 
-    fseek(f->fd, index_offset, SEEK_SET);
+    fseek(f->fd, index_off, SEEK_SET);
     fread((void*) f->index_header, sizeof(bom_index_header_t), 1, f->fd);
 
-    f->index_section = malloc(index_size);
-    fread((void*) f->index_section, index_size, 1, f->fd);
+    f->index_section = malloc(index_sz);
+    fread((void*) f->index_section, index_sz, 1, f->fd);
 
     return ERR_NOERR;
 }
@@ -131,7 +129,7 @@ int bom_read_var(bom_file_t *f, bom_var_t **ret)
     return ERR_NOERR;
 }
 
-int bom_get_data_offset(bom_file_t *f, uint32_t id, uint32_t *addr, uint32_t *size)
+int bom_get_data_offset(bom_file_t *f, uint32_t id, uint32_t *add, uint32_t *siz)
 {
     bom_index_t *index;
     int err;
@@ -140,8 +138,8 @@ int bom_get_data_offset(bom_file_t *f, uint32_t id, uint32_t *addr, uint32_t *si
         ERR_CHECK(err, bom_read_index(f))
 
     index = f->index_section + ntohl(id);
-    *addr = index->addr;
-    *size = index->size;
+    *add = index->addr;
+    *siz = index->size;
 
     return ERR_NOERR;
 }
@@ -167,7 +165,7 @@ int bom_read_file(bom_file_t *f, uint32_t index0, uint32_t index1,
     uint32_t addr;
     uint32_t size;
     uint32_t pos;
-    uint8_t *buf;
+    char *buf;
 
     ALLOC_CHECK(*file = malloc(sizeof(bom_file_entry_t)))
     ERR_CHECK(err, bom_get_data_offset(f, ntohl(index1), &addr, &size));
@@ -185,7 +183,7 @@ int bom_read_file(bom_file_t *f, uint32_t index0, uint32_t index1,
     (*file)->parent_index = *((uint32_t*) buf);
     (*file)->name = malloc(size - sizeof(uint32_t));
 
-    strncpy((*file)->name, (char*) buf + sizeof(uint32_t), size - sizeof(uint32_t));
+    strncpy((*file)->name, buf + sizeof(uint32_t), size - sizeof(uint32_t));
 
     /* index0 is file info */
 
@@ -198,7 +196,7 @@ int bom_read_file(bom_file_t *f, uint32_t index0, uint32_t index1,
     return ERR_NOERR;
 }
 
-int bom_get_path(bom_file_t *f, uint32_t index, bom_path_t **p, bom_indice_t **in)
+int bom_get_path(bom_file_t *f, uint32_t id, bom_path_t **p, bom_indice_t **in)
 {
     int err;
     uint32_t addr;
@@ -206,7 +204,7 @@ int bom_get_path(bom_file_t *f, uint32_t index, bom_path_t **p, bom_indice_t **i
     uint32_t indice_count;
     uint32_t i = 0;
 
-    ERR_CHECK(err, bom_get_data_offset(f, index, &addr, &size))
+    ERR_CHECK(err, bom_get_data_offset(f, id, &addr, &size))
     ALLOC_CHECK(*p = realloc(*p, sizeof(bom_path_t)))
 
     fseek(f->fd, ntohl(addr), SEEK_SET);
@@ -258,4 +256,3 @@ void bom_var_free(bom_var_t *v)
     free(v->name);
     free(v);
 }
-

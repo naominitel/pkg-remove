@@ -137,10 +137,11 @@ int bom_open_file(char const *path, bom_file_t **file);
 int bom_read_header(bom_file_t *file);
 int bom_read_index(bom_file_t *file);
 int bom_read_var(bom_file_t *file, bom_var_t **var);
-int bom_get_data_offset(bom_file_t *f, uint32_t id, uint32_t *addr, uint32_t *size);
+int bom_get_data_offset(bom_file_t *f, uint32_t i, uint32_t *add, uint32_t *siz);
 int bom_get_value_tree(bom_var_t *var, bom_file_t *file, bom_tree_t **ret);
 int bom_get_path(bom_file_t *f, uint32_t id, bom_path_t **p, bom_indice_t **in);
-int bom_get_file_at_indice(bom_file_t *f, bom_indice_t *i, bom_file_entry_t **e, bom_fileinfo1_t **in);
+int bom_get_file_at_indice(bom_file_t *f, bom_indice_t *i, 
+    bom_file_entry_t **e, bom_fileinfo1_t **in);
 
 void bom_file_free(bom_file_t *f);
 void bom_var_free(bom_var_t *v);
