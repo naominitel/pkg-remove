@@ -1,10 +1,14 @@
 #include "bom.h"
 
 #include <CoreFoundation/CFDictionary.h>
+#include <CoreFoundation/CFPropertyList.h>
+#include <CoreFoundation/CFURLAccess.h>
 
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+
+char const *PKG_DIR = "/var/db/receipts/";
 
 typedef struct file_tree
 {
@@ -178,11 +182,88 @@ void remove_files(file_tree_t *tree, char *prefix)
     free(fullpath);
 }
 
+char* get_pkgfile(char const *pkgname, char const *sfx)
+{
+    /* return /var/db/receipts/<pkgname><sfx> */
+    
+    size_t s1 = strlen(PKG_DIR);
+    size_t s2 = strlen(pkgname);
+    size_t s3 = strlen(sfx);
+    char *ret;
+
+    ret = malloc(s1 + s2 + s3 + 1);
+
+    memcpy(ret, PKG_DIR, s1);
+    memcpy(ret + s1, pkgname, s2);
+    memcpy(ret + s1 + s2, sfx, s3);
+
+    ret[s1 + s2 + s3] = '\0';
+
+    return ret;
+}
+
+char* get_prefix(char const *pkgname)
+{
+    /*
+     * Each package as a .plist file associated with it located under
+     * /var/db/receipts/<pkg>.plist telling some metadata about the 
+     * installation of the package.
+     * This data contains a key InstallPrefixPath that tells under which
+     * location the files listed in the BOM have been placed
+     */
+
+    CFStringRef s;
+    CFStringRef ret;
+    CFURLRef url;
+    CFDataRef data;
+    CFPropertyListRef plist;
+    size_t sr;
+    char *pth;
+    char *buf;
+    
+    /* get the full path of the plist file */
+
+    pth = get_pkgfile(pkgname, ".plist");
+
+    s = CFStringCreateWithCStringNoCopy(NULL, pth, kCFStringEncodingUTF8, NULL);
+    url = CFURLCreateWithFileSystemPath(NULL, s, kCFURLPOSIXPathStyle, 1);
+
+    CFURLCreateDataAndPropertiesFromResource(NULL, url, &data, NULL, NULL, NULL);
+    plist = CFPropertyListCreateWithData(NULL, data, kCFPropertyListImmutable, 
+        NULL, NULL);
+
+    /* get the key InstallPrefixPath */
+
+    CFStringRef key = CFSTR("InstallPrefixPath");
+    ret = CFDictionaryGetValue(plist, key);
+
+    /*
+     * FIXME: InstallPrefixPath is relative to the root of the volume where
+     * the package has been installed. For now we assume it to be '/' but
+     * one should find where it is stored
+     */
+
+    sr = CFStringGetLength(ret) + 1;
+    buf = malloc(sr + 1);
+    buf[0] = '/';
+    CFStringGetCString(ret, buf + 1, sr, kCFStringEncodingUTF8);
+
+    CFRelease(plist);
+    CFRelease(data);
+    CFRelease(ret);
+    CFRelease(url);
+    CFRelease(s);
+
+    return buf;
+}
+
 int main(int argc, char *argv[])
 {
     CFMutableDictionaryRef files;
     bom_file_t *f;
     char *fname;
+    char *fpath;
+    char *prefx;
 
     if(argc < 2)
     {
@@ -191,16 +272,20 @@ int main(int argc, char *argv[])
     }
 
     fname = argv[1];
+    fpath = get_pkgfile(fname, ".bom");
 
-    if(bom_open_file(fname, &f) != ERR_NOERR)
+    if(bom_open_file(fpath, &f) != ERR_NOERR)
     {
         fprintf(stderr, "Unable to open file\n");
         return EXIT_FAILURE;
     }
 
     files = list_files(f);
-    remove_files(arborize(files), "/");
+    prefx = get_prefix(fname);
+    remove_files(arborize(files), prefx);
 
     free(files);
+    free(fpath);
+    free(prefx);
     bom_file_free(f);
 }
