@@ -185,7 +185,7 @@ void remove_files(file_tree_t *tree, char *prefix)
 char* get_pkgfile(char const *pkgname, char const *sfx)
 {
     /* return /var/db/receipts/<pkgname><sfx> */
-    
+
     size_t s1 = strlen(PKG_DIR);
     size_t s2 = strlen(pkgname);
     size_t s3 = strlen(sfx);
@@ -202,7 +202,7 @@ char* get_pkgfile(char const *pkgname, char const *sfx)
     return ret;
 }
 
-char* get_prefix(char const *pkgname)
+char* get_prefix(char *pkgname)
 {
     /*
      * Each package as a .plist file associated with it located under
@@ -248,30 +248,24 @@ char* get_prefix(char const *pkgname)
     buf[0] = '/';
     CFStringGetCString(ret, buf + 1, sr, kCFStringEncodingUTF8);
 
+    CFRelease(url);
     CFRelease(plist);
     CFRelease(data);
-    CFRelease(ret);
-    CFRelease(url);
-    CFRelease(s);
+
+    // FIXME: should uncomment this, but makes Racket segfault ?!
+    // CFRelease(ret);
+    // CFRelease(s);
 
     return buf;
 }
 
-int main(int argc, char *argv[])
+int pkg_remove(char *fname)
 {
     CFMutableDictionaryRef files;
     bom_file_t *f;
-    char *fname;
     char *fpath;
     char *prefx;
 
-    if(argc < 2)
-    {
-        fprintf(stderr, "Usage: %s <file>\n", argv[0]);
-        return EXIT_FAILURE;
-    }
-
-    fname = argv[1];
     fpath = get_pkgfile(fname, ".bom");
 
     if(bom_open_file(fpath, &f) != ERR_NOERR)
@@ -288,4 +282,6 @@ int main(int argc, char *argv[])
     free(fpath);
     free(prefx);
     bom_file_free(f);
+
+    return EXIT_SUCCESS;
 }
